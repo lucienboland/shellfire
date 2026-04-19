@@ -10,6 +10,7 @@
 #   PATH priority (highest to lowest):
 #     ~/opt/*/bin          User-installed tools (each subdir's bin/)
 #     ~/opt/bin            General user binaries
+#     ~/.local/bin         XDG user binaries (symlinks to ~/.local/share/*/bin)
 #     ~/bin                Personal scripts
 #     $HOMEBREW/bin        Homebrew-installed binaries
 #     $HOMEBREW/sbin       Homebrew system binaries
@@ -76,6 +77,10 @@ fi
 
 # ~/bin -- personal scripts and symlinks
 _path_prepend "${HOME}/bin"
+
+# ~/.local/bin — XDG-compliant user binaries.
+# Tool symlinks installed by ./install.sh (e.g. burrow) live here.
+_path_prepend "${HOME}/.local/bin"
 
 # ~/opt/bin -- manually installed tools
 _path_prepend "${HOME}/opt/bin"
