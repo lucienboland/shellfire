@@ -21,6 +21,7 @@
 #   environment     Environment vars (core/03_environment.bash)
 #   completions     Tab completion (core/04_completions.bash)
 #   ssh-agent       SSH agent (core/05_ssh-agent.bash)
+#   loader          @module external loader (shellfire.bash)
 #   credentials     Credential loader (plugins/credentials.bash)
 #   git-prompt      Git prompt (plugins/git-prompt.bash)
 #   languages       Language runtimes (plugins/languages.bash)
@@ -1050,6 +1051,144 @@ if _t_section "ssh-agent" "SSH agent discovery (core/05_ssh-agent.bash)"; then
   fi
 fi
 
+
+
+# #############################################################################
+#
+# SECTION: loader
+# File tested: shellfire.bash (@module external loader branch)
+#
+# Tests the @module external loader:
+#   - Resolution via NAME_HOME env var
+#   - Resolution via XDG_DATA_HOME default path
+#   - Population of __shellfire_external_modules array
+#   - Graceful warning (not abort) when module is missing
+#
+# #############################################################################
+
+if _t_section "loader" "@module external loader (shellfire.bash)"; then
+
+  # Create a temp directory for the fake external module and config
+  _T_LOADER_DIR=$(mktemp -d "${TMPDIR:-/tmp}/shellfire-loader-test.XXXXXX")
+
+  # Create a minimal fake external module "fake".
+  # It defines one function and calls _status_set to exercise the full path.
+  mkdir -p "${_T_LOADER_DIR}/fake_home"
+  cat > "${_T_LOADER_DIR}/fake_home/fake.bash" <<'FAKE_MODULE'
+_fake_version() { echo "fake-1.0"; }
+if command -v _status_set &>/dev/null; then
+  _status_set "fake" "ok" "loaded ok"
+fi
+FAKE_MODULE
+
+  # Config dir with only @fake in plugins.conf
+  mkdir -p "${_T_LOADER_DIR}/config/plugins"
+  printf '@fake\n' > "${_T_LOADER_DIR}/config/plugins.conf"
+
+  # XDG_DATA_HOME dir for default-path resolution
+  mkdir -p "${_T_LOADER_DIR}/xdg_data/fake"
+  cp "${_T_LOADER_DIR}/fake_home/fake.bash" \
+     "${_T_LOADER_DIR}/xdg_data/fake/fake.bash"
+
+  # Config dir for missing-module test
+  mkdir -p "${_T_LOADER_DIR}/missing_config/plugins"
+  printf '@nonexistent\n' > "${_T_LOADER_DIR}/missing_config/plugins.conf"
+
+  # -- Test 1: @module loads via NAME_HOME env var --------------------------
+  _t_cmd "@module loads when FAKE_HOME is set" \
+    "FAKE_HOME=... bash -c 'source shellfire.bash; declare -f _fake_version'"
+
+  _t_loader_out=$(
+    SHELLFIRE_VERBOSE=0 \
+    SHELLFIRE_CONFIG_HOME="${_T_LOADER_DIR}/config" \
+    FAKE_HOME="${_T_LOADER_DIR}/fake_home" \
+    bash -c '
+      source "'"${_T_DIR}"'/shellfire.bash" 2>/dev/null </dev/null
+      declare -f _fake_version &>/dev/null && echo "FN=yes" || echo "FN=no"
+    ' 2>/dev/null
+  ) || true
+
+  if [[ "${_t_loader_out}" == *"FN=yes"* ]]; then
+    _t_pass "@module: _fake_version defined after load via FAKE_HOME"
+  else
+    _t_fail "@module: _fake_version defined after load via FAKE_HOME" \
+      "output: ${_t_loader_out}"
+  fi
+
+  # -- Test 2: __shellfire_external_modules is populated --------------------
+  _t_cmd "__shellfire_external_modules contains @fake" \
+    "bash -c 'source shellfire.bash; printf \"%s\\n\" \"\${__shellfire_external_modules[@]:-}\"'"
+
+  _t_loader_out2=$(
+    SHELLFIRE_VERBOSE=0 \
+    SHELLFIRE_CONFIG_HOME="${_T_LOADER_DIR}/config" \
+    FAKE_HOME="${_T_LOADER_DIR}/fake_home" \
+    bash -c '
+      source "'"${_T_DIR}"'/shellfire.bash" 2>/dev/null </dev/null
+      printf "%s\n" "${__shellfire_external_modules[@]:-}"
+    ' 2>/dev/null
+  ) || true
+
+  if [[ "${_t_loader_out2}" == *"@fake"* ]]; then
+    _t_pass "@fake is in __shellfire_external_modules"
+  else
+    _t_fail "@fake is in __shellfire_external_modules" \
+      "output: ${_t_loader_out2}"
+  fi
+
+  # -- Test 3: Default path resolves via XDG_DATA_HOME ---------------------
+  # When FAKE_HOME is absent the loader must find ${XDG_DATA_HOME}/fake/fake.bash
+  _t_cmd "@module resolves via XDG_DATA_HOME when NAME_HOME absent" \
+    "XDG_DATA_HOME=... bash -c 'source shellfire.bash; declare -f _fake_version'"
+
+  _t_loader_out3=$(
+    SHELLFIRE_VERBOSE=0 \
+    SHELLFIRE_CONFIG_HOME="${_T_LOADER_DIR}/config" \
+    XDG_DATA_HOME="${_T_LOADER_DIR}/xdg_data" \
+    bash -c '
+      unset FAKE_HOME
+      source "'"${_T_DIR}"'/shellfire.bash" 2>/dev/null </dev/null
+      declare -f _fake_version &>/dev/null && echo "FN=yes" || echo "FN=no"
+    ' 2>/dev/null
+  ) || true
+
+  if [[ "${_t_loader_out3}" == *"FN=yes"* ]]; then
+    _t_pass "@module resolves default path via XDG_DATA_HOME"
+  else
+    _t_fail "@module resolves default path via XDG_DATA_HOME" \
+      "output: ${_t_loader_out3}"
+  fi
+
+  # -- Test 4: Missing external module warns but does not abort load --------
+  _t_cmd "Missing @module logs warning and does not abort" \
+    "SHELLFIRE_CONFIG_HOME=missing_config bash -c 'source shellfire.bash; echo LOADED'"
+
+  _t_loader_warn=$(
+    SHELLFIRE_VERBOSE=2 \
+    SHELLFIRE_CONFIG_HOME="${_T_LOADER_DIR}/missing_config" \
+    bash -c '
+      source "'"${_T_DIR}"'/shellfire.bash" 2>&1 </dev/null
+      echo "LOADED=yes"
+    ' 2>&1
+  ) || true
+
+  if [[ "${_t_loader_warn}" == *"External module not found"* || \
+        "${_t_loader_warn}" == *"not found"* ]]; then
+    _t_pass "Missing @module logs a warning"
+  else
+    _t_fail "Missing @module logs a warning" "output: ${_t_loader_warn}"
+  fi
+
+  if [[ "${_t_loader_warn}" == *"LOADED=yes"* ]]; then
+    _t_pass "Missing @module does not abort shellfire load"
+  else
+    _t_fail "Missing @module does not abort shellfire load" \
+      "output: ${_t_loader_warn}"
+  fi
+
+  rm -rf "${_T_LOADER_DIR}"
+
+fi
 
 
 # #############################################################################
