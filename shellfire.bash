@@ -186,6 +186,7 @@ unset _sf_module local_filename
 # ---------------------------------------------------------------------------
 
 __shellfire_plugin_modules=()
+__shellfire_external_modules=()
 _sf_plugins_conf="${__shellfire_config_home}/plugins.conf"
 
 if [[ -f "${_sf_plugins_conf}" ]]; then
@@ -197,17 +198,39 @@ if [[ -f "${_sf_plugins_conf}" ]]; then
     _sf_plugin_name="${_sf_line##*( )}"
     _sf_plugin_name="${_sf_plugin_name%%*( )}"
 
-    _sf_plugin_file="${__shellfire_config_home}/plugins/${_sf_plugin_name}.bash"
+    # @name entries are external modules installed outside the config layer.
+    # Resolution order:
+    #   1. ${NAME_HOME}/name.bash  — if NAME_HOME env var is set (e.g. SPARKS_HOME)
+    #   2. ${XDG_DATA_HOME}/name/name.bash  — default XDG install location
+    if [[ "${_sf_plugin_name}" == @* ]]; then
+      _sf_ext_name="${_sf_plugin_name:1}"                                    # "sparks"
+      _sf_ext_home_var="${_sf_ext_name^^}_HOME"                              # "SPARKS_HOME"
+      _sf_ext_home="${!_sf_ext_home_var:-${XDG_DATA_HOME:-${HOME}/.local/share}/${_sf_ext_name}}"
+      _sf_plugin_file="${_sf_ext_home}/${_sf_ext_name}.bash"
 
-    if [[ -f "${_sf_plugin_file}" ]]; then
-      local_filename="${_sf_plugin_name}.bash"
-      __shellfire_plugin_modules+=("${local_filename}")
-      __shellfire_current_file="${local_filename}"
-      _log_section "plugins/${local_filename}"
-      # shellcheck disable=SC1090
-      source "${_sf_plugin_file}"
+      if [[ -f "${_sf_plugin_file}" ]]; then
+        __shellfire_external_modules+=("@${_sf_ext_name}")
+        __shellfire_current_file="@${_sf_ext_name}"
+        _log_section "@${_sf_ext_name}"
+        # shellcheck disable=SC1090
+        source "${_sf_plugin_file}"
+      else
+        _log_warn "External module not found: ${_sf_plugin_file}"
+        _log_info "Install: git clone git@github.com:lucienboland/${_sf_ext_name}.git ${_sf_ext_home}"
+      fi
     else
-      _log_warn "Plugin not found: ${_sf_plugin_file}"
+      _sf_plugin_file="${__shellfire_config_home}/plugins/${_sf_plugin_name}.bash"
+
+      if [[ -f "${_sf_plugin_file}" ]]; then
+        local_filename="${_sf_plugin_name}.bash"
+        __shellfire_plugin_modules+=("${local_filename}")
+        __shellfire_current_file="${local_filename}"
+        _log_section "plugins/${local_filename}"
+        # shellcheck disable=SC1090
+        source "${_sf_plugin_file}"
+      else
+        _log_warn "Plugin not found: ${_sf_plugin_file}"
+      fi
     fi
   done < "${_sf_plugins_conf}"
 else
@@ -215,6 +238,7 @@ else
 fi
 
 unset _sf_line _sf_plugin_name _sf_plugin_file _sf_plugins_conf local_filename
+unset _sf_ext_name _sf_ext_home_var _sf_ext_home
 unset __shellfire_current_file
 
 # ---------------------------------------------------------------------------

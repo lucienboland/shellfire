@@ -34,6 +34,7 @@
 #   __shellfire_status_order   (from lib/logging.bash)
 #   __shellfire_core_modules   (from shellfire.bash)
 #   __shellfire_plugin_modules (from shellfire.bash)
+#   __shellfire_external_modules (from shellfire.bash)
 #   __shellfire_hostname       (from shellfire.bash)
 #   __shellfire_os             (from shellfire.bash)
 #   __shellfire_start_time     (from shellfire.bash)
@@ -385,7 +386,7 @@ _banner_render() {
   # -- System info line -----------------------------------------------------
   # Format: user@host · OS · bash X.Y · N modules · 0.12s
   local bash_ver="${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
-  local total_modules=$(( ${#__shellfire_core_modules[@]} + ${#__shellfire_plugin_modules[@]} ))
+  local total_modules=$(( ${#__shellfire_core_modules[@]} + ${#__shellfire_plugin_modules[@]} + ${#__shellfire_external_modules[@]} ))
 
   # Compute elapsed time
   local elapsed="?"
@@ -430,6 +431,21 @@ _banner_render() {
 
     for mod in "${__shellfire_plugin_modules[@]}"; do
       local mod_name="${mod%.bash}"
+      local state="${__shellfire_status_state[${mod_name}]:-ok}"
+      local detail="${__shellfire_status_detail[${mod_name}]:-}"
+      _status_row "${state}" "${mod}" "${detail}"
+    done
+
+    _empty_row
+  fi
+
+  # -- External section (modules loaded from outside the config layer) ------
+  if (( ${#__shellfire_external_modules[@]} > 0 )); then
+    _section_divider "external"
+    _empty_row
+
+    for mod in "${__shellfire_external_modules[@]}"; do
+      local mod_name="${mod:1}"          # strip @ prefix: "@sparks" -> "sparks"
       local state="${__shellfire_status_state[${mod_name}]:-ok}"
       local detail="${__shellfire_status_detail[${mod_name}]:-}"
       _status_row "${state}" "${mod}" "${detail}"
