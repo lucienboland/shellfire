@@ -30,7 +30,6 @@
 #   fzf             Fuzzy finder (plugins/fzf.bash)
 #   tmux-helpers    Tmux wrappers (plugins/tmux-helpers.bash)
 #   tools           Misc tools (plugins/tools.bash)
-#   dgs             DGS connector (plugins/dgs.bash)
 #   copilot-sess    Copilot sessions (plugins/copilot-sessions.bash)
 #   integration     Full framework load test
 #
