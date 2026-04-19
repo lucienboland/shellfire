@@ -216,16 +216,16 @@ if [[ -f "${_sf_plugins_conf}" ]]; then
         source "${_sf_plugin_file}"
       else
         _log_warn "External module not found: ${_sf_plugin_file}"
-        _log_info "Install: git clone git@github.com:lucienboland/${_sf_ext_name}.git ${_sf_ext_home}"
+        _log_info "Install ${_sf_ext_name} to ${_sf_ext_home} and re-source your shell"
       fi
     else
       _sf_plugin_file="${__shellfire_config_home}/plugins/${_sf_plugin_name}.bash"
 
       if [[ -f "${_sf_plugin_file}" ]]; then
-        local_filename="${_sf_plugin_name}.bash"
-        __shellfire_plugin_modules+=("${local_filename}")
-        __shellfire_current_file="${local_filename}"
-        _log_section "plugins/${local_filename}"
+        _sf_local_filename="${_sf_plugin_name}.bash"
+        __shellfire_plugin_modules+=("${_sf_local_filename}")
+        __shellfire_current_file="${_sf_local_filename}"
+        _log_section "plugins/${_sf_local_filename}"
         # shellcheck disable=SC1090
         source "${_sf_plugin_file}"
       else
@@ -237,7 +237,7 @@ else
   _log_warn "plugins.conf not found at ${_sf_plugins_conf} -- no plugins loaded"
 fi
 
-unset _sf_line _sf_plugin_name _sf_plugin_file _sf_plugins_conf local_filename
+unset _sf_line _sf_plugin_name _sf_plugin_file _sf_plugins_conf _sf_local_filename
 unset _sf_ext_name _sf_ext_home_var _sf_ext_home
 unset __shellfire_current_file
 
