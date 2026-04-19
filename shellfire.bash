@@ -15,6 +15,8 @@
 # Dependencies:
 #   XDG_CONFIG_HOME   Must be set before this file is sourced (done in
 #                     ~/.bash_profile)
+#   SHELLFIRE_CONFIG_HOME  Optional override for the user config directory
+#                          (defaults to ${XDG_CONFIG_HOME}/shellfire)
 #
 # Exports (global variables):
 #   __shellfire_os              Operating system name (e.g. "Darwin")
@@ -24,7 +26,8 @@
 #   __shellfire_start_time      EPOCHREALTIME at framework init
 #   __shellfire_core_modules    Array of loaded core module filenames
 #   __shellfire_plugin_modules  Array of loaded plugin filenames
-#   __shellfire_dir             Path to the configuration directory
+#   __shellfire_home            Path to the framework installation directory (auto-detected)
+#   __shellfire_config_home     Path to the user config directory (~/.config/shellfire)
 #
 # Load order:
 #   lib/colours.bash -> lib/logging.bash -> lib/banner.bash
@@ -44,13 +47,22 @@
 __shellfire_start_time="${EPOCHREALTIME:-}"
 
 # ---------------------------------------------------------------------------
-# Framework directory
+# Framework home — derived from the location of this script.
+#
+# We use BASH_SOURCE[0] so this resolves correctly regardless of how
+# shellfire.bash is sourced (direct path, via .bash_profile, or from
+# shellfire-dev's --init-file invocation).  realpath is used to resolve
+# symlinks so that ~/.shellfire/ → ~/code/shellfire/ works transparently.
 # ---------------------------------------------------------------------------
+__shellfire_home="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 
-# SHELLFIRE_DIR allows pointing shellfire at a different config directory.
-# Used for dev workflow isolation: SHELLFIRE_DIR=~/dev/dotfiles/dot_config/bash bash
-# When unset, defaults to the standard XDG location.
-__shellfire_dir="${SHELLFIRE_DIR:-${XDG_CONFIG_HOME}/bash}"
+# ---------------------------------------------------------------------------
+# Config home — where the user's plugins.conf, plugins/, and conf.d/ live.
+#
+# Defaults to the XDG-compliant ~/.config/shellfire/.
+# Override with SHELLFIRE_CONFIG_HOME for testing or shellfire-dev.
+# ---------------------------------------------------------------------------
+__shellfire_config_home="${SHELLFIRE_CONFIG_HOME:-${XDG_CONFIG_HOME}/shellfire}"
 
 # ---------------------------------------------------------------------------
 # Global variables available to all modules
@@ -70,22 +82,12 @@ export __shellfire_os
 __shellfire_verbose="${SHELLFIRE_VERBOSE:-1}"
 export __shellfire_verbose
 
-# Backward compatibility aliases -- some modules may still reference the
-# old __bashrc_* names.  These will be removed in a future cleanup.
-__bashrc_os="${__shellfire_os}"
-__bashrc_verbose="${__shellfire_verbose}"
-export __bashrc_os __bashrc_verbose
-
 # ---------------------------------------------------------------------------
 # Hostname detection
 # ---------------------------------------------------------------------------
 
 __shellfire_hostname="$(hostname -s)"
 export __shellfire_hostname
-
-# Backward compat
-__bashrc_hostname="${__shellfire_hostname}"
-export __bashrc_hostname
 
 # _get_short_hostname -- Produce an abbreviated hostname (max 5 characters).
 #
@@ -122,10 +124,6 @@ _get_short_hostname() {
 __shellfire_short_hostname="$(_get_short_hostname)"
 export __shellfire_short_hostname
 
-# Backward compat
-__bashrc_short_hostname="${__shellfire_short_hostname}"
-export __bashrc_short_hostname
-
 # ---------------------------------------------------------------------------
 # Source shared libraries
 #
@@ -140,11 +138,11 @@ export __bashrc_short_hostname
 # ---------------------------------------------------------------------------
 
 # shellcheck disable=SC1091
-source "${__shellfire_dir}/lib/colours.bash"
+source "${__shellfire_home}/lib/colours.bash"
 # shellcheck disable=SC1091
-source "${__shellfire_dir}/lib/logging.bash"
+source "${__shellfire_home}/lib/logging.bash"
 # shellcheck disable=SC1091
-source "${__shellfire_dir}/lib/banner.bash"
+source "${__shellfire_home}/lib/banner.bash"
 
 # ---------------------------------------------------------------------------
 # Source core modules
@@ -160,7 +158,7 @@ source "${__shellfire_dir}/lib/banner.bash"
 
 __shellfire_core_modules=()
 
-for _sf_module in "${__shellfire_dir}"/core/[0-9][0-9]_*.bash; do
+for _sf_module in "${__shellfire_home}"/core/[0-9][0-9]_*.bash; do
   if [[ -f "${_sf_module}" ]]; then
     local_filename="${_sf_module##*/}"
     __shellfire_core_modules+=("${local_filename}")
@@ -188,7 +186,7 @@ unset _sf_module local_filename
 # ---------------------------------------------------------------------------
 
 __shellfire_plugin_modules=()
-_sf_plugins_conf="${__shellfire_dir}/plugins.conf"
+_sf_plugins_conf="${__shellfire_config_home}/plugins.conf"
 
 if [[ -f "${_sf_plugins_conf}" ]]; then
   while IFS= read -r _sf_line || [[ -n "${_sf_line}" ]]; do
@@ -199,7 +197,7 @@ if [[ -f "${_sf_plugins_conf}" ]]; then
     _sf_plugin_name="${_sf_line##*( )}"
     _sf_plugin_name="${_sf_plugin_name%%*( )}"
 
-    _sf_plugin_file="${__shellfire_dir}/plugins/${_sf_plugin_name}.bash"
+    _sf_plugin_file="${__shellfire_config_home}/plugins/${_sf_plugin_name}.bash"
 
     if [[ -f "${_sf_plugin_file}" ]]; then
       local_filename="${_sf_plugin_name}.bash"
