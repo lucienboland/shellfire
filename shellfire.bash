@@ -52,7 +52,7 @@ __shellfire_start_time="${EPOCHREALTIME:-}"
 # We use BASH_SOURCE[0] so this resolves correctly regardless of how
 # shellfire.bash is sourced (direct path, via .bash_profile, or from
 # shellfire-dev's --init-file invocation).  realpath is used to resolve
-# symlinks so that ~/.shellfire/ → ~/code/shellfire/ works transparently.
+ # symlinks so that ~/.local/share/shellfire/ → ~/code/shellfire/ works transparently.
 # ---------------------------------------------------------------------------
 __shellfire_home="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 

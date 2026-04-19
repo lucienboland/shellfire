@@ -3,7 +3,7 @@
 ## 1. Clone the framework
 
 ```bash
-git clone git@github.com:lucienboland/shellfire.git ~/.shellfire
+git clone git@github.com:lucienboland/shellfire.git ~/.local/share/shellfire
 ```
 
 ## 2. Create your config skeleton
@@ -22,7 +22,7 @@ export XDG_CONFIG_HOME="${HOME}/.config"
 export XDG_CACHE_HOME="${HOME}/.cache"
 export XDG_DATA_HOME="${HOME}/.local/share"
 
-source "${SHELLFIRE_HOME:-${HOME}/.shellfire}/shellfire.bash"
+source "${SHELLFIRE_HOME:-${HOME}/.local/share/shellfire}/shellfire.bash"
 ```
 
 ## 4. Open a new terminal
@@ -37,7 +37,7 @@ Create plugin files in `~/.config/shellfire/plugins/` and list them in
 ## Updating
 
 ```bash
-git -C ~/.shellfire pull
+git -C ~/.local/share/shellfire pull
 ```
 
 ## Framework development
